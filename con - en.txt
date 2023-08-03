@@ -1,0 +1,14 @@
+Z-axis contact position: Z=124MM (Fill with zero if selecting X-axis contact trigger)
+X-axis contact position: X=0MM (Fill with zero if selecting Z-axis contact trigger)
+X-axis offset: X=51.6MM
+Y-axis offset: Y=8.9MM
+Is triggering structure only at Z axis: 1 (Non-zero value indicates so. This option is invalid when selecting X-axis as your trigger.)
+Retraction length: 20MM
+Retraction compensation: 0MM
+Nozzle distance: 3.4MM (During assembly, the nozzle's position should be slightly higher than the pen tip; otherwise, nozzle leakage could heavily contaminate your model.)
+Z-axis error compensation: 0MM (May be needed for certain machines that are not equipped with anti-backlash nuts, as noticeable errors can occur after shuttling movement. This option is invalid when selecting X-axis as your trigger.)
+Cooling for leak prevention: 20°„C (Reducing temperature can effectively minimize leakage.)
+Force Z-axis home: 1 (Non-zero value indicates so. Actually Z-axis error compensation is not so effective so I'm afraid that you need this option)
+Customized Deploy: undefined
+Customized Retract: undefined
+prepared for English readers. Don't forget to rename this file to "con.txt" after deleting the Chinese version.

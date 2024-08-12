@@ -1,3 +1,4 @@
+# Using ballpen to apply support material contact surfaces for FDM printers
 使用方法：
 0.买一些点点胶替芯。
 1.下载并打印文件夹里的零件
@@ -5,7 +6,7 @@
 3.打开软件并填写配置
 4.把Gcode放到软件所在的文件夹
 5.启动软件，生成处理好的gcode
-# Using ballpen to apply support material contact surfaces for FDM printers
+
 Hello! This project is designed to enhance 3D print support quality. To get started, please follow these steps:
 0.Have some ballpens. You may want to order some online. NOT every of them is capable to do the job. You need gluepen refill("点点胶替芯" in Chinese）
 1.Download and Print:

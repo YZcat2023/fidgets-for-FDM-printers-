@@ -1,248 +1,456 @@
-#coding=gb18030
-import re, os,fileinput
-#parameters
-ztouch=xtouch=xoffset=yoffset=Nozzoff=atX=Filalen=FilaCom=zCom=Tem=Forcedz=0
-input=output='NULL'
-index=0;patndex=0
-valid_file=False#ÎªF¼´ÎŞ¿ÉÓÃÎÄ¼ş
-flag=flag1=flag2=False
-reSignal=False
-ZComcum=0
-Gflag=False#·ÀÖ¹±»ÆæÆæ¹Ö¹ÖµÄG92 E0´øÆ«
-CustomD="NULL"#×Ô¶¨Òå·ÅÏÂ
-CustomR="NULL"#×Ô¶¨ÒåÊÕÆğ
-fcon = open("con.txt")
-temp=fcon.read()
-s = []
-path=[]
-currHeight=0#´æ´¢µ±Ç°ËùÔÚµÄ¸ß¶È
-currExtrude=0#´æ´¢µ±Ç°µÄ¼·³ö
-item=""
-s = re.findall("\d+\.?\d*", temp)
-s = list(map(float,s))
-ztouch=s[0];xtouch=s[1];xoffset=s[2];yoffset=s[3];atX=s[4];Filalen=s[5];FilaCom=s[6];Nozzoff=s[7];zCom=s[8];Tem=s[9];Forcedz=s[10]
-#print(s)
-#print(Tem)
-s.clear()
+# coding=utf-8
+from collections import OrderedDict
+import tkinter as tk  # å¯¼å…¥GUIç•Œé¢å‡½æ•°åº“
+from tkinter import ttk,scrolledtext
+import tkinter.messagebox
+import re, os, fileinput, time, ctypes, sys
+from PIL import Image, ImageTk
+import base64
+from in_png import img as png1
+import ParsingTMP
+from ParsingTMP import parse_file, write_filtered_file,filter_data
+ctypes.windll.shcore.SetProcessDpiAwareness(1)
+ScaleFactor = ctypes.windll.shcore.GetScaleFactorForDevice(0)
+# åˆ›å»ºçª—å£
+window = tk.Tk()
+window.title('Markpen v2.2')
+screenWidth = window.winfo_screenwidth()  # è·å–æ˜¾ç¤ºåŒºåŸŸçš„å®½åº¦
+screenHeight = window.winfo_screenheight()  # è·å–æ˜¾ç¤ºåŒºåŸŸçš„é«˜åº¦
+width = 300  # è®¾å®šçª—å£å®½åº¦
+height = 160  # è®¾å®šçª—å£é«˜åº¦
+left = (screenWidth - width) / 2
+top = (screenHeight - height) / 2
+window.geometry("%dx%d+%d+%d" % (width, height, left, top))
+window.resizable(width=False, height=False)
+tmp = open('in.png', 'wb')        #åˆ›å»ºä¸´æ—¶çš„æ–‡ä»¶
+tmp.write(base64.b64decode(png1))    ##æŠŠè¿™ä¸ªoneå›¾ç‰‡è§£ç å‡ºæ¥ï¼Œå†™å…¥æ–‡ä»¶ä¸­å»ã€‚
+tmp.close()
+image0 = Image.open("in.png")
+image0 = image0.resize((300, 160))
+os.remove("in.png")
+tk_image = ImageTk.PhotoImage(image0)
+label = tk.Label(window, image=tk_image)
+label.pack()
+window.tk.call('tk', 'scaling', ScaleFactor / 75)
 
-for line1 in fileinput.input("con.txt"):
-    #print( line1)
-    if line1.find("XÖáÆ«ÒÆ") != -1 and line1.find("-") != -1:
-        xoffset=-xoffset
-    if line1.find("YÖáÆ«ÒÆ") != -1 and line1.find("-") != -1:
-        yoffset = -yoffset
-    if line1.find("ZÖáÎó²î²¹³¥") != -1 and line1.find("-") != -1:
-        zCom= -zCom
-    if line1.find("»Ø³é²¹³¥") != -1 and line1.find("-") != -1:
-        FilaCom= -FilaCom
-    if line1.find("×Ô¶¨ÒåÊÕÆğ")!=-1:
-        index=line1.find("£º")
-        CustomD=line1[index+1:]
-    if line1.find("×Ô¶¨Òå·ÅÏÂ")!=-1:
-        index=line1.find("£º")
-        CustomR=line1[index+1:]
+# parameters
+# X_Operable=0#Xè½´ç§»åŠ¨åˆ°æ­¤ä½ç½®å³å¯æ“ä½œç¬”æ†
+# X_Inoperable=0#Xè½´ç§»åŠ¨åˆ°æ­¤ä½ç½®ä¸å¯æ”¹å˜ç¬”æ†è§’åº¦
+# Y_Lockdown=0#Yè½´ç§»åŠ¨åˆ°æ­¤ä½ç½®å³ä½¿å¾—ç¬”æ†é”å®šåˆ°å·¥ä½œä½
+# Y_Release=0#Yè½´ç§»åŠ¨åˆ°æ­¤ä½ç½®ä½¿å¾—ç¬”æ†ä¸å†å¯å·¥ä½œ
+Z_Offset=0#ç¬”å°–åœ¨å·¥ä½œä½æ—¶æ¯”å–·å˜´æ›´ä½ï¼Œè¿™ä¸ªå€¼æ˜¯å–·å˜´ä¸ç¬”å°–é—´çš„é«˜åº¦å·®
+CustomClean=[]#è‡ªå®šä¹‰æ“¦å˜´ä»£ç 
+NocleanThreshold=0#è¶…è¿‡è¯¥ç­‰å¾…æ—¶é—´å³è¿›è¡Œæ“¦å˜´
+X_Offset=0#å–·å˜´ä¸ç¬”å°–çš„Xåæ ‡çš„å·®å€¼
+Y_Offset=0#å–·å˜´ä¸ç¬”å°–çš„Yåæ ‡çš„å·®å€¼
+AggressiveRetract=0#ä¸ä¸ºé›¶æ—¶å°†è¿›è¡Œè¾ƒä¸ºæ¿€è¿›çš„å›æŠ½
+Max_Speed=0#æœ€é«˜ç§»åŠ¨é€Ÿåº¦
+Max_Acceleration=0# æœ€é«˜åŠ é€Ÿåº¦
+CustomRelease=[]#è‡ªå®šä¹‰æ”¶å›ï¼ˆæ”¶å›ç¬”æ†ï¼‰
+CustomLock=[]#è‡ªå®šä¹‰é”å®šï¼ˆæ”¾ä¸‹ç¬”æ†ï¼‰
+# æ˜¯å¦æœ‰con.iniï¼Œå¦‚æœæ²¡æœ‰åˆ™è‡ªåŠ¨åˆ›å»º
+Create_New_Config = 'no'
+User_Input=[]
+Source = []
+Marked_path = []
+Output_Filename=''#å¯¼å‡ºæ–‡ä»¶å
+Input_Filename=""#å¯¼å…¥æ–‡ä»¶å
+global GcodeExporter,LogExporter
+def get_preset_values():
+    # åˆ›å»ºä¸»çª—å£
+    root = tk.Tk()
+    root.withdraw()  # éšè—ä¸»çª—å£
+    # åˆ›å»ºå¼¹çª—è¯¢é—®æ˜¯å¦ä½¿ç”¨é»˜è®¤ ç¬”æ†æ“ä½œæ–¹å¼
+    # TypeResult = tk.messagebox.askquestion("", "æ˜¯å¦ä½¿ç”¨é»˜è®¤çš„æŠ¬ç¬”/è½ç¬”çš„æ“ä½œæ–¹å¼ï¼Ÿ", default=tk.messagebox.YES)
+    # CleanResult=tk.messagebox.askquestion("", "æ‚¨çš„æœºå™¨æ˜¯å¦æ”¯æŒæ“¦å˜´ï¼Ÿ", default=tkinter.messagebox.YES)
+    popup = tk.Toplevel(root)
+    popup.resizable(width=False, height=False)
+    popup.title("é…ç½®å‘å¯¼")
+    # åˆ›å»ºæ ‡ç­¾å’Œè¾“å…¥æ¡†
+    # if TypeResult=='yes':
+    #     labels = ["Xè½´å¯æ“ä½œåæ ‡", "Xè½´ä¸å¯æ“ä½œåæ ‡", "Yè½´é”å®šåæ ‡", "Yè½´å¼¹èµ·åæ ‡","å–·å˜´ç¬”å°–é«˜åº¦å·®","æœ€é«˜ç§»åŠ¨é€Ÿåº¦","æ“¦å˜´ä»£ç ","Xåæ ‡è¡¥å¿å€¼","Yåæ ‡è¡¥å¿å€¼"]
+    # else:
+    #     labels = ["è‡ªå®šä¹‰æ”¶èµ·Gä»£ç ", "è‡ªå®šä¹‰æ”¾ä¸‹Gä»£ç ","å–·å˜´ç¬”å°–é«˜åº¦å·®","æœ€é«˜ç§»åŠ¨é€Ÿåº¦","æ“¦å˜´ä»£ç ","Xåæ ‡è¡¥å¿å€¼","Yåæ ‡è¡¥å¿å€¼"]
+    labels = ["è‡ªå®šä¹‰æ”¶èµ·Gä»£ç ", "è‡ªå®šä¹‰æ”¾ä¸‹Gä»£ç ", "å–·å˜´ç¬”å°–é«˜åº¦å·®", "æœ€é«˜ç§»åŠ¨é€Ÿåº¦", "æ“¦å˜´ä»£ç ", "Xåæ ‡è¡¥å¿å€¼",
+              "Yåæ ‡è¡¥å¿å€¼"]
+    entries = []
+    for i,label in enumerate(labels):
+        tk.Label(popup, text=label + ":", justify='left', padx=10).grid(row=i, column=0, sticky='w')
+        entry = tk.Entry(popup)
+        if label in ["è‡ªå®šä¹‰æ”¶èµ·Gä»£ç ", "è‡ªå®šä¹‰æ”¾ä¸‹Gä»£ç ", "æ“¦å˜´ä»£ç "]:
+            # å¯¹äºç‰¹å®šçš„labelï¼Œä½¿ç”¨scrolledtext.ScrolledTextæ¥åˆ›å»ºå¸¦æœ‰æ»šåŠ¨æ¡çš„Textæ§ä»¶
+            text_box = scrolledtext.ScrolledText(popup, wrap=tk.WORD, width=10, height=3.5)
+            text_box.grid(row=i, column=1, padx=10, sticky='ew')  # sticky='ew' ä½¿æ§ä»¶åœ¨åˆ—ä¸­æ°´å¹³æ‰©å±•
+            # ç”±äºæˆ‘ä»¬ä½¿ç”¨äº†scrolledtext.ScrolledTextï¼Œæ‰€ä»¥ä¸éœ€è¦å•ç‹¬æ·»åŠ entriesåˆ°è¿™ä¸ªåˆ—è¡¨ä¸­
+            entries.append(text_box)
+        else:
+            entry.grid(row=i, column=1, padx=10)
+            entries.append(entry)
+    def on_submit():
+        global User_Input
+        for entry in entries:
+            if isinstance(entry, tk.Entry):
+                User_Input.append(entry.get())
+            elif isinstance(entry, scrolledtext.ScrolledText):
+                User_Input.append(entry.get(1.0, tk.END))  # Get text from 1.0 to the end
+        # User_Input = [entry.get() for entry in entries]
+        values = 1
+        popup.destroy()
+        root.quit()# å…³é—­å¼¹çª—
+        return values
 
-for item in os.listdir():
-    if item.find(".g") !=-1 or item.find(".x3g")!=-1:#Ê¶±ğ.G,.GCODE,.X3G,¼´ÊäÈëÎÄ¼ş
-        if item.find("Output")==-1:
-            input=item
-            valid_file=True
-#ÕÒµ½gcodeÎÄ¼ş£¬²¢È·¶¨¸ÃÎÄ¼şÊÇ·ñÒÑ´¦Àí¹ıµÄÎÄ¼ş
-index=input.find(".")
-output=input[0:index]+"_Output.gcode"
+    style = ttk.Style()
+    style.configure('Rounded.TButton', roundcorners=25)  # è®¾ç½®åœ†è§’çš„å¤§å°
+    ttk.Button(popup, text="ç¡®å®š", style='Rounded.TButton', command=on_submit).grid(row=len(labels), column=1,
+                                                                                      pady=10)
+    # è¿›å…¥ä¸»å¾ªç¯ï¼Œç­‰å¾…ç”¨æˆ·æ“ä½œ
+    root.mainloop()
+    root.destroy()
+    # è¿™é‡Œæ­£å¸¸æƒ…å†µä¸‹ä¸ä¼šæ‰§è¡Œï¼Œå› ä¸ºmainloopä¼šé˜»å¡ï¼Œç›´åˆ°çª—å£å…³é—­
+    return []
 
-for item in os.listdir():
-    if item == output:
-        os.remove(item)
-#Çå³ıÉÏÒ»´ÎÉú³ÉµÄÎÄ¼ş
-if valid_file:
-    with open(input, "r") as f:#¶ÁÈ¡ÊäÈëÎÄ¼ş
-        with open(output, "w") as f1:#Êä³öÎÄ¼ş
-            with open("log.txt", "w") as f2:  # Êä³öÈÕÖ¾
-                print("Find your Gcode Successfully", file=f2)  #ÈÕÖ¾ËµÃ÷´ËÊ±ÎŞÎó
-                print("CustomD: " + CustomD, file=f2)
-                print("CustomR: " + CustomR, file=f2)
-                for line in f.readlines():
-                    line = line.strip('\n')#È¥µô»»ĞĞ·û
-                    if line.find("M104 S")!=-1:
-                        index=line.find("S")
-                        s = re.findall("\d+\.?\d*", line[index:])
-                        Currtem=float(s[0])
-                    if line.find(";LAYER_CHANGE")==-1:
-                        print(line, file=f1)  # ½«ÃüÁîÔ­ÑùĞ´Èë
-                        #¸÷¸öÄ£¿é
-                        if line.find("G1 Z") != -1:  # Èç¹ûº¬ÓĞZÌ§ÉıµÄÃüÁî
-                            if line.find(".")==4:
-                                linetemp="G1 Z0"+line[4:]#Èç¹ûÊÇ.47ÕâÖÖ
-                                s = re.findall("\d+\.?\d*", linetemp)
-                                s = list(map(float, s))
-                            else:
-                                s = re.findall("\d+\.?\d*", line)
-                                s = list(map(float, s))
-                            currHeight = s[1]
-                            print("Height Change: " + str(currHeight), file=f2)  # ÈÕÖ¾¼ÇÂ¼´ËÊ±µÄÃüÁî
-                            #print(line, file=f2)  # ÈÕÖ¾¼ÇÂ¼´ËÊ±µÄÃüÁî
-                            if reSignal==True:
-                                print("G1 E" + str(format(float(currExtrude), '.3f')), file=f1)  # »Ø³é
-                                reSignal=False
-                        if currHeight >= 0.47:  #´ËÄ£¿éÔÚÇ°¼¸²ã²»ÔÊĞíÊ¹ÓÃ
+def environment_check():  # åå¤„ç†å‰çš„æ“ä½œ]
+    global CustomClean,CustomLock,CustomRelease,Z_Offset,Max_Speed,X_Offset,Y_Offset,Input_Filename,Output_Filename
+    valid_con = False
+    valid_file=False
+    for file in os.listdir():
+        if "con.ini" in file:  # ä½¿ç”¨ 'in' æ¥æ£€æŸ¥å­å­—ç¬¦ä¸²æ˜¯å¦å­˜åœ¨äºæ–‡ä»¶åä¸­
+            valid_con = True
+            break  # å¦‚æœåªéœ€è¦æ‰¾åˆ°ç¬¬ä¸€ä¸ªåŒ¹é…çš„æ–‡ä»¶ï¼Œå¯ä»¥ä½¿ç”¨ break è·³å‡ºå¾ªç¯
+    # å¦‚æœæœ‰é…ç½®æ–‡ä»¶çš„è¯:
+    if valid_con:
+        ConfigReader = open("con.ini")
 
-                            # Èç¹ûº¬ÓĞ½Ó´¥Ãæ×¢ÊÍ
+    # å¦‚æœæ²¡æœ‰çš„è¯:
+    else:
+        Create_New_Config = tk.messagebox.askquestion(title='æ— å¯ç”¨é¢„è®¾',message='å½“å‰æ–‡ä»¶å¤¹ä¸‹æ— å¯ç”¨é¢„è®¾ã€‚åˆ›å»ºæ–°é¢„è®¾ï¼Ÿ')
+        if Create_New_Config == 'yes':
+            with open("con.ini", "w") as ConfigExporter:
+                get_preset_values()
+                print(User_Input)
+                print("è‡ªå®šä¹‰æ”¶èµ·Gä»£ç :" + os.linesep+str(User_Input[0]), file=ConfigExporter)
+                print("è‡ªå®šä¹‰æ”¾ä¸‹Gä»£ç :" + os.linesep+str(User_Input[1]), file=ConfigExporter)
+                print("å–·å˜´ç¬”å°–é«˜åº¦å·®:" + str(User_Input[2]), file=ConfigExporter)
+                print("æœ€é«˜ç§»åŠ¨é€Ÿåº¦:" + str(User_Input[3]), file=ConfigExporter)
+                print("æ“¦å˜´ä»£ç :" + os.linesep+str(User_Input[4]), file=ConfigExporter)
+                print("Xåæ ‡è¡¥å¿å€¼:" + str(User_Input[5]), file=ConfigExporter)
+                print("Yåæ ‡è¡¥å¿å€¼:" + str(User_Input[6]), file=ConfigExporter)
+            ConfigExporter.close()
+            tk.messagebox.showinfo(title='å®Œæˆ', message='æ•°æ®å·²ç»å½•å…¥ã€‚è½¯ä»¶å°†è‡ªåŠ¨å…³é—­ï¼Œè¯·é‡æ–°å¯åŠ¨')
+            sys.exit("Data Fetched")
+        else:
+            sys.exit("User cancelled:ç”¨æˆ·ç»ˆæ­¢")
+            
+        ConfigReader = open("con.ini")
+    # è¯»å…¥åˆ°ä¸´æ—¶æ–‡ä»¶é‡Œï¼›
+    Con_Temp = ConfigReader.read()
+    lines = Con_Temp.splitlines()
 
-                            if line.find(";TYPE:Support material interface") != -1:  # Èç¹ûº¬ÓĞÖ§³Å½Ó´¥ÃæµÄ×¢ÊÍ
-                                print("Support interface, Height: " + str(currHeight), file=f2)
-                                #print("Check:"+line,file=f2)
-                                flag = True  # ¹ÒÉÏÌáÊ¾Ó¦µ±¿ªÊ¼¼ÇÂ¼²Î¿¼Â·¾¶
-                                flag1=True#½ÓÏÂÀ´ÒªÊ¹ÓÃÂí¿Ë±Ê
-                                path.clear()   
-                            if flag == True:
+    Copy_path_flag=False
+    for index in range(len(lines)):
+        if lines[index].find("è‡ªå®šä¹‰æ”¶èµ·Gä»£ç :")!=-1:
+            Copy_path_flag=True
+        if Copy_path_flag==True:
+            if lines[index].find("è‡ªå®šä¹‰æ”¾ä¸‹Gä»£ç ")==-1:
+                if lines[index]!="" and lines[index].find("è‡ªå®šä¹‰")==-1:
+                    CustomRelease.append(lines[index])
+            else:
 
-                                if line.find("Perimeter") == -1 and line.find(";TYPE:Support material")==-1:
-                                    path.append(line)  # ½«ÕâÃüÁî¼ÇÂ¼ÏÂÀ´£¬×÷ÎªÂí¿Ë±ÊÔËĞĞµÄÂ·¾¶²Î¿¼
-                                    #print("OriginPath: " + line, file=f2)  # ËµÃ÷ÊÇÔ­ÓĞÂ·¾¶
-                                #if line.find("G92 E0")!=-1
-                                #    count
-                                if line.find("Perimeter") != -1 or (line.find(";TYPE:Support material")!=-1 and line.find("interface")==-1):
-                                    path.append(line)#¼ÇÂ¼Õâ¸öÇĞ»»
-                                    flag = False  # °ÑÌáÊ¾È¡ÏÂ
-                                    #print(path,file=f2)
-                                    print("Perimeter detected,stop copying", file=f2)  # ¼ÆÈëÈÕÖ¾
-                                    #print(";Perimeter detected,stop copying", file=f1)  # ¼ÆÈëÈÕÖ¾
+                Copy_path_flag=False
+                break
+    for index in range(len(lines)):
+        if lines[index].find("è‡ªå®šä¹‰æ”¾ä¸‹Gä»£ç :")!=-1:
+            Copy_path_flag=True
+        if Copy_path_flag==True:
+            if lines[index].find("å–·å˜´ç¬”å°–")==-1:
+                if lines[index]!="" and lines[index].find("è‡ªå®šä¹‰")==-1:
+                    CustomLock.append(lines[index])
+            else:
+                Copy_path_flag=False
+                break
 
-                        if line.find("G1")!=-1 and line.find("E")!=-1:
-                            index=line.find("E")
-                            s = re.findall("\d+\.?\d*",line[index:])
-                            currExtrude=s[0]#µ±Ç°¼·³ö
+    for index in range(len(lines)):
+        if lines[index].find("æ“¦å˜´ä»£ç :")!=-1:
+            Copy_path_flag=True
+        if Copy_path_flag==True:
+            if lines[index].find("Xåæ ‡")==-1:
+                if lines[index]!="" and lines[index].find("æ“¦å˜´")==-1:
+                    CustomClean.append(lines[index])
+            else:
+                Copy_path_flag=False
+                break
+
+    for index in range(len(lines)):
+        if lines[index].find("å–·å˜´ç¬”å°–")!=-1:
+            Z_Offset=re.findall(r"\d+\.?\d*", lines[index])
+        if lines[index].find("æœ€é«˜ç§»åŠ¨")!=-1:
+            Max_Speed=re.findall(r"\d+\.?\d*", lines[index])
+        if lines[index].find("Xåæ ‡è¡¥å¿å€¼") != -1:
+            X_Offset= re.findall(r"\d+\.?\d*", lines[index])
+            if lines[index].find("-") != -1:
+                X_Offset[0]="-"+X_Offset[0]
+        if lines[index].find("Yåæ ‡è¡¥å¿å€¼") != -1:
+            Y_Offset = re.findall(r"\d+\.?\d*", lines[index])
+            if lines[index].find("-") != -1:
+                Y_Offset[0] ="-"+Y_Offset[0]
+
+    Z_Offset=float(Z_Offset[0])
+    Max_Speed=float(Max_Speed[0])
+    X_Offset=float(X_Offset[0])
+    Y_Offset=float(Y_Offset[0])
+
+    # print(CustomRelease)
+    # print(CustomLock)
+    # print(CustomClean)
+    # print(Z_Offset)
+    # print(Max_Speed)
+    # print(X_Offset)
+    # print(Y_Offset)
+
+    # æ£€ç´¢ç›®å½•ä¸‹çš„æ‰€æœ‰gcodeï¼Œx3gç±»æ–‡ä»¶
+    for file in os.listdir():
+        # print(os.listdir())
+        if file.find(".g") != -1 or file.find(".x3g") != -1 or file.find(".gcode") != -1:  # è¯†åˆ«.G,.GCODE,å³è¾“å…¥æ–‡ä»¶
+            # ç¡®å®šè¯¥æ–‡ä»¶æ˜¯å¦å·²å¤„ç†è¿‡çš„æ–‡ä»¶
+
+            if file.find("Output") == -1:
+                Input_Filename = file
+                valid_file = True  # æœ‰æ–‡ä»¶
+                # break
+            # else:
+            #     tk.messagebox.showerror(title='é”™è¯¯', message='ç¨‹åºæ‰€åœ¨æ–‡ä»¶å¤¹ä¸‹å·²æœ‰è¾“å‡ºGcodeæ–‡ä»¶')
+            #     sys.exit("Already exists:å·²æœ‰Gcode")
+
+    if valid_file != True:
+        tk.messagebox.showerror(title='é”™è¯¯', message='ç¨‹åºæ‰€åœ¨æ–‡ä»¶å¤¹ä¸‹æ— å¯ç”¨Gcodeæ–‡ä»¶')
+        sys.exit("No usable gcode:æ— å¯ç”¨Gcode")
+
+    # è¾“å‡ºæ—¶çš„åç§°
+    Filename_index = Input_Filename.find(".gcode")
+    Output_Filename = Input_Filename[0:Filename_index] + "_Output.gcode"
+    print(Output_Filename)
+    # æ¸…é™¤ä¸Šä¸€æ¬¡ç”Ÿæˆçš„æ–‡ä»¶
+    for file in os.listdir():
+        if file == Output_Filename:
+            os.remove(file)
+def Str_Strip(line):
+        Source = re.findall(r"\d+\.?\d*", line)
+        Source = list(map(float, Source))
+        data = Source[0]
+        return data
+
+def format_xy_string(text):
+    def process_data(match):
+        if match:
+            return f"{match.group(1)}{float(match.group(2)):.3f}"
+        return ""
+
+    text = re.sub(r'(X)([\d.]+)', lambda m: process_data(m), text)
+    text = re.sub(r'(Y)([\d.]+)', lambda m: process_data(m), text)
+    return text
+
+def process_text(text,x_offset,y_offset):
+  text=format_xy_string(text)
+  pattern = r"(X|Y)(\d+\.\d+)"  # åŒ¹é…Xæˆ–Yï¼Œåé¢è·Ÿç€ä¸€ä¸ªæˆ–å¤šä¸ªæ•°å­—å’Œå°æ•°ç‚¹
+  match = re.findall(pattern, text)
+  # print(match)
+  # åˆ›å»ºä¸€ä¸ªå­—å…¸å­˜å‚¨ä¿®æ”¹åçš„æ•°å€¼
+  values = {}
+  for m in match:
+    key, value = m
+    if key == 'X':
+      values[key] = round(float(value) +x_offset, 3)
+    else:
+      values[key] = round(float(value) +y_offset, 3)
+
+  # æ›¿æ¢åŸæ–‡æœ¬ä¸­çš„æ•°å€¼
+  for key, value in values.items():
+    text = re.sub(rf"{key}\d+\.\d+", f"{key}{value}", text)
+  # pattern = r"E[\-\+]?\d+\.\d+"
+  # pattern = r"E[\.\-\+]?\d*"
+  text=text[:text.find("E")]
+  # text=text+";Cured"
+  # text = re.sub(pattern, "", text)
+  return text
+
+# def find_previous_key(rev_dict, current_loc):
+#     loc_dict = OrderedDict(rev_dict.items(), reversed=True)
+#     it = iter(loc_dict)
+#     print(it)
+#     # æ‰¾åˆ°å½“å‰ä½ç½®
+#     for key in it:
+#         if key == current_loc:
+#             break
+#         prev_loc = next(it)
+#         return prev_loc
+def merge_files(file1, file2,temp_file_name,CustomLock,CustomRelease):
+    with open(file1, 'r',encoding="utf-8", errors='ignore') as f1, open(file2, 'r',encoding="utf-8", errors='ignore') as f2:
+        lines1 = f1.readlines()
+        lines2 = f2.readlines()
+
+        # åˆ›å»ºä¸€ä¸ªå­—å…¸ï¼Œç”¨äºå­˜å‚¨ç¬¬äºŒä¸ªæ–‡ä»¶ä¸­ä»¥"LOC"å¼€å¤´çš„è¡ŒåŠå…¶åç»­æ•°æ®
+        loc_dict = {}
+        current_loc = None
+        for line in lines2:
+            if line.startswith(";LOC"):
+                current_loc = line.strip()
+                loc_dict[current_loc] = ""
+            else:
+                if current_loc:
+                    loc_dict[current_loc] += line.strip() + "\n"
+        # print(loc_dict.keys())
+        # å¤„ç†ç¬¬ä¸€ä¸ªæ–‡ä»¶
+        # result = []
+        insert_flag=False
+        # prev_loc=None
+        GcodeExporter = open(temp_file_name+"_Output.gcode", "w",encoding="utf-8")
+        for line in lines1:
+            line = line.strip('\n')
+            if line.startswith(";LOC") and line.strip() in loc_dict:
+                current_loc=line.strip()
+                # print("WORKS!"+current_loc)
+                insert_flag=True
+                print(line,file=GcodeExporter)
+            else:
+                print(line,file=GcodeExporter)
+            if line.startswith("G1 E-"):
+                if insert_flag==True:
+                    print(";Warning:"+line,file=GcodeExporter)
+                    for index in range(len(CustomLock)):
+                        print(CustomLock[index], file=GcodeExporter)
+                    print(loc_dict[current_loc], file=GcodeExporter)
+                    for index in range(len(CustomRelease)):
+                        print(CustomRelease[index], file=GcodeExporter)
+                    for index in range(len(CustomClean)):
+                        print(CustomClean[index], file=GcodeExporter)
+                    insert_flag=False
+
+        GcodeExporter.close()
+
+
+def main():
+    Layer_Flag=False
+    Copy_Flag=False
+    LayerCount=0
+    LST_Raise=False
+    AreaCount=0
+    InterFace=[]
+    Current_Layer_Height=0
+    LSTpoint=""
+    LST_Flag=False
+    environment_check()
+    # print(Output_Filename)
+
+    # GcodeExporter = open(Output_Filename, "w")
+    # LogExporter = open(Input_Filename + ".log", "w")
+    temp_file_name=Input_Filename.strip(".gcode")
+    RawExporter = open(temp_file_name+".raw", "w",encoding="utf-8", errors='ignore')
+    TempExporter = open(temp_file_name+".tmp", "w",encoding="utf-8", errors='ignore')
+    Temp2Exporter = open(temp_file_name + ".tmp2", "w",encoding="utf-8", errors='ignore')
+    with open(Input_Filename, "r",encoding="utf-8", errors='ignore') as f:  # è¯»å–è¾“å…¥æ–‡ä»¶,æ­¤è¿‡ç¨‹ç²—å¤„ç†æ–‡ä»¶
+        for line in f.readlines():
+            line = line.strip('\n')  # å»æ‰æ¢è¡Œç¬¦
+            if (line.find("X")!=-1 or line.find("Y")!=-1) and line.find("G1")!=-1:
+                LST_Sup = line[:line.find("E")]
+
+            if LST_Flag == True and (line.find("X")!=-1 or line.find("Y")!=-1) and line.find("G1")!=-1:
+                LSTpoint = line
+                LST_Flag = False
+                pattern = r"E[\.\-\+]?\d*"
+                LST_index=LSTpoint.find("E")
+                LSTpoint=LSTpoint[:LST_index]
+                # print(LSTpoint + ";LST", file=RawExporter)
+            #æ£€æŸ¥å±‚é«˜çš„å˜åŒ–
+            if line.find(";LAYER_CHANGE")!=-1:
+                Layer_Flag=True
+                LayerCount+=1
+                AreaCount=0
+            if Layer_Flag==True and line.find(";Z:")!=-1:
+                Current_Layer_Height=Str_Strip(line)
+                Layer_Flag=False
+                # print(Current_Layer_Height)
+            if line.find(";TYPE:Support interface")!=-1:
+                LST_Raise=True
+                Copy_Flag=True
+                AreaCount+=1
+                print(";LOC"+str(LayerCount)+"B"+str(AreaCount),file=RawExporter)
+                print(";LOC" + str(LayerCount) + "B" + str(AreaCount),file=TempExporter)
+                print("G1 Z"+str(round(Current_Layer_Height+Z_Offset,3))+";Keep this",file=TempExporter)
+            if Copy_Flag==True:
+                if LST_Raise ==True:
+                    InterFace.append(LST_Sup + ";RAIKeep")
+                    LST_Raise=False
+                if line.find(";TYPE:Inner wall")==-1 and line.find(";TYPE:Outer wall")==-1 and line.find(";TYPE:Support")==-1:
+                    if line.find("Z") != -1 and (line.find("X")!=-1 or line.find("Y")!=-1) and line.find("E")==-1:
+                        pass
                     else:
-                        if flag1 == True:
-                            if Filalen!=0:  # Èç¹ûÒªÇóÁË»Ø³éºÄ²Ä
-                               print(";Filament retracting:", file=f1)
-                               print("G1 E" + str(format(float(currExtrude) - Filalen,'.3f')), file=f1)  # »Ø³é
-                               print("Filament retracted!", file=f2)  # ÈÕÖ¾ËµÃ÷´ËÊ±»Ø³é
-                               print("G1 Z"+str(format(currHeight+0.5,'.3f')),file=f1)
-                               reSignal = True  # ÌáÊ¾ÏÂ´Î¾ÍĞèÒª×°ÔØºÄ²ÄÁË
+                        InterFace.append(line)
 
-                            print(";TYPE:Markpen path", file=f1)  # Ğ´Èë×¢ÊÍËµÃ÷ÕâĞ©ÊÇÂí¿Ë±ÊµÄÂ·¾¶
+                if line.find(";WIPE_START")!=-1:#å¦‚æœå‘ç°äº†å¼€å§‹æ“¦å˜´çš„æŒ‡ä»¤
+                    LST_Flag = True
+                    for index in range(len(InterFace)):
+                        print(InterFace[index],file=TempExporter)
+                    InterFace.clear()#è¾“å‡ºå¹¶æ¸…ç©ºå·²æ•è·çš„å†…å®¹
+                    AreaCount+=1#åŒºåŸŸè®¡æ•°åŠ ä¸€
+                    print(";LOC" + str(LayerCount) + "B" + str(AreaCount), file=TempExporter)#å‘ä¸´æ—¶æ–‡ä»¶ä¸å¯¼å‡ºçš„G codeä¸­ è¾“å‡ºå½“å‰çš„loc
+                    print(";LOC" + str(LayerCount) + "B" + str(AreaCount), file=RawExporter)
 
+                if line.find(";WIPE_END")!=-1:
+                    print("G1 Z" + str(round(Current_Layer_Height + Z_Offset, 3)) + ";Keep thisWPE", file=TempExporter)
 
-                            if CustomR.find("undefined")!=-1:
-                                if ztouch!=0:
-                                    if atX == 1:
-                                        print("G1 X0", file=f1)
-                                    print("G1 Z" + str(ztouch), file=f1)  # lift nozzle
-                                    # °ÑZÖáÉÏÉıµ½ÄÜ´¥·¢µÄ¸ß¶È£¬Zspx±íÊ¾×î´óËÙ¶È¡£´ËÊ±ÊÇ°´ÏÂ
-                                    print("G1 Z" + str(format(currHeight+Nozzoff+5,'.3f')), file=f1)  # lower nozzle
-                                    # ½µ»Ø¸Õ¸Õ¼ÇÔØµÄ¸ß¶È£¬Ò²¾ÍÊÇcurrHeightÕâ¸ö±äÁ¿¼ÇÂ¼µÄ¸ß¶È,¼Ó5·ÀÖ¹±ÊÍ·ÎÛÈ¾ÆäËûµØ·½
-                                elif xtouch!=0:
-                                    print("G1 Z"+format(currHeight+Nozzoff,".3f"),file=f1)
-                                    #Éı¸ßÅç×ìÒÔ·À¹Ğ²ä
-                                    print("G1 X"+str(xtouch),file=f1)
-                                    #×²»÷´¥·¢
-                                    print("G1 X"+str(xtouch-35),file=f1)
-                                    #ËÉ¿ª
-                                if Tem != 0:
-                                    print("M104 S" + str(Currtem - Tem), file=f1)
-                                print("Default Deploy",file=f2)
+                if line.find(";TYPE:Inner wall") != -1 or line.find(";TYPE:Outer wall") != -1 or (line.find(";TYPE:Support")!=-1 and line.find("interface")==-1):  # å¦‚æœå‘ç°äº†typeçš„ç±»å‹çš„å˜æ¢
+                    Copy_Flag = False  # ä¸å†è®°å½•
+                    LST_Flag = True
+                    print(";ENDLOC",file=RawExporter)
+                    for index in range(len(InterFace)):
+                        print(InterFace[index], file=TempExporter)
+                    InterFace.clear()  # è¾“å‡ºå¹¶æ¸…ç©ºå·²æ•è·çš„å†…å®¹
+                    print("G1 Z" + str(round(Current_Layer_Height, 3))+";Keep this", file=RawExporter)
+            print(line, file=RawExporter)
 
+    f.close()
+    RawExporter.close()
+    TempExporter.close()
+    LOC_Dict = parse_file(temp_file_name+".tmp")
+    Retained_Dict = filter_data(LOC_Dict)
+    write_filtered_file(Retained_Dict, temp_file_name + ".tmp1")
+    # print(X_Offset,Y_Offset)
+    with open(temp_file_name+".tmp1", "r",encoding="utf-8", errors='ignore') as f:  # è¯»å–è¾“å…¥æ–‡ä»¶,æ­¤è¿‡ç¨‹ç²—å¤„ç†æ–‡ä»¶
+        for line in f.readlines():
+            line = line.strip('\n')  # å»æ‰æ¢è¡Œç¬¦
+            if line.find("G1")!=-1 and line.find("E-.")==-1 and line.find("G1 F")==-1 and line.find("G1 E")==-1:
+                if line.find("Z")==-1 or (line.find("Z")!=-1 and line.find("Keep")!=-1) or ((line.find("X")!=-1 or line.find("Y")!=-1) and line.find('G1')!=-1 and line.find("Z")!=-1):
+                    if line.find("Z") == -1:
+                        print(process_text(line, X_Offset, Y_Offset), file=Temp2Exporter)
+                    else:
+                        if line.find("RAI") != -1:
+                            print(process_text(line[:line.find("Z")], X_Offset, Y_Offset), file=Temp2Exporter)
+                        else:
+                            if line.find("Keep")!=-1 and line.find("RAI")==-1:
+                                print(line)
+                                print(process_text(line, X_Offset, Y_Offset), file=Temp2Exporter)
+                            if ((line.find("X")!=-1 or line.find("Y")!=-1) and line.find('G1')!=-1 and line.find("Z")!=-1):
+                                print(process_text(line[:line.find("Z")], X_Offset, Y_Offset), file=Temp2Exporter)
+                    # print(process_text(line,X_Offset,Y_Offset),file=Temp2Exporter)
 
-                            else:
-                                print(CustomD,file=f1)
-                                print("Customized Deploy",file=f2)
-                                if Tem != 0:
-                                    print("M104 S" + str(Currtem - Tem), file=f1)
-                            # ÈÕÖ¾¼ÇÂ¼
+            elif line.find("G3")==-1 and line.find(";TYPE:")==-1 and line.find(";WIDTH")==-1 and line.find("G1 F")==-1 and line.find("M73")==-1 and line.find("E-.")==-1 and line.find(";WIPE")==-1 and line.find("Keep")==-1 and line.find("G1 E")==-1:
+                print(line, file=Temp2Exporter)
 
-                            print("Markpen path starting", file=f2)  # Ğ´ÈëÈÕÖ¾ËµÃ÷ÕâĞ©ÊÇÂí¿Ë±ÊµÄÂ·¾¶
-                            #print(path,file=f2)
-                            for pathindex,item in enumerate(path):
-                                if item.find(";") != -1 or item.find("G1") == -1:
-                                    print("Not valid Path: " + item, file=f2)
-                                    if item.find("G92 E0")!=-1:
-                                        print("G1 Z"+str(format(currHeight+Nozzoff+0.5,'.3f')),file=f1)#ÉÔÎ¢Éı¸ß0.5£¬ÒÔÃâ¹Ğ²ä
-                                        if path[pathindex+3].find("TYPE")==-1:  #²¢Î´ÇĞ»»ÀàĞÍ
-                                            Gflag=True#ÌáÊ¾½ÓÏÂÀ´Òª¼õµÍ¸ß¶È
-                                        else:
-                                            break#Ê£ÏÂµÄÒ²²»±Ø¿´ÁË
+    Temp2Exporter.close()
+    # ç¤ºä¾‹ç”¨æ³•
+    file1 = temp_file_name+".raw"
+    file2 = temp_file_name+".tmp2"
+    merge_files(file1, file2,temp_file_name,CustomLock,CustomRelease)
 
+    for file in os.listdir():
+        if file == temp_file_name+".tmp" or file == temp_file_name+".raw" or file == temp_file_name+".tmp1" or file == temp_file_name+".tmp2":
+            os.remove(file)
+            pass
+    exit(0)
 
-                                else:
-                                    #ÒÔÏÂÎªÂí¿Ë±ÊÊä³öÂ·¾¶
-                                    s = re.findall("\d+\.?\d*", item)
-                                    if item.find("X") != -1 and item.find("Y") != -1:  # X,Y¶¼´æÔÚ
-                                        #print("Original: " + item, file=f2)  # Ğ´ÈëÈÕÖ¾
-                                        print("G1 X" + str(format(float(s[1]) + xoffset,'.3f')) + " Y" +
-                                              str(format(float(s[2]) +yoffset,'.3f')), file=f1)
-                                        #print("Modified:" + "G1 X" + str(format(float(s[1]) + xoffset, '.3f')) + " Y" + str(format(float(s[2]) + yoffset, '.3f')), file=f2)#Ğ´ÈëÈÕÖ¾
-                                        if flag2 == False:
-                                            print("G1 Z" + str(format(currHeight+Nozzoff,'.3f')), file=f1)
-                                            #print(";Path 1",file=f1)
-                                            flag2=True
-                                    if item.find("Y") == -1 and item.find("X") != -1:  # Ö»ÓĞX
-                                        #print("Original: " + item, file=f2)  # Ğ´ÈëÈÕÖ¾
-                                        print("G1 X" + str(format(float(s[1]) + xoffset,'.3f')), file=f1)
-                                        #print("Modified:" + "G1 X" + str(format(float(s[1]) + xoffset,'.3f')),file=f2)  # Ğ´ÈëÈÕÖ¾
-                                        if flag2 == False:
-                                            print("G1 Z" + str(format(currHeight+Nozzoff,'.3f')), file=f1)
-                                            #print(";Path 1", file=f1)
-                                            flag2 = True
-                                    if item.find("Y") != -1 and item.find("X") == -1:  # Ö»ÓĞY
-                                        #print("Original: " + item, file=f2)  # Ğ´ÈëÈÕÖ¾
-                                        print("G1 Y" + str(format(float(s[1]) + yoffset,'.3f')), file=f1)
-                                        #print("Modified:" + "G1 Y" + str(format(float(s[1]) + yoffset,'.3f')),file=f1)
-                                        if flag2 == False:
-                                            print("G1 Z" + str(format(currHeight+Nozzoff,'.3f')), file=f1)
-
-                                            flag2 = True
-                                    if Gflag==True:
-                                        print("G1 Z"+str(format(currHeight+Nozzoff,'.3f')),file=f1)
-                                        Gflag=False
-
-                            #path.clear()
-
-                            print("G1 Z"+str(format(currHeight+Nozzoff+5,'.3f')),file=f1)#ÉÔÎ¢ÉıÆğÒ»ÏÂ´òÓ¡»úÅç×ì
-
-                            #print(atX)
-
-                            if Tem!=0:
-                                print("M104 S"+str(Currtem),file=f1)
-                            if CustomR.find("undefined")!=-1:
-                                if ztouch!=0:
-                                    if atX == 1:
-                                        print("G1 X0", file=f1)
-                                    if zCom!=0:
-                                        print("G1 Z" + str(ztouch + ZComcum), file=f1)  # lift nozzle
-                                        ZComcum+=zCom
-                                    else:
-                                        print("G1 Z" + str(ztouch), file=f1)  # lift nozzle
-                                    # °ÑZÖáÉÏÉıµ½ÄÜ´¥·¢µÄ¸ß¶È£¬Zspx±íÊ¾×î´óËÙ¶È¡£´ËÊ±ÊÇ°´ÏÂ
-                                    print("G1 Z" + str(format(currHeight+Nozzoff+5,'.3f')), file=f1)  # lower nozzle
-                                    # ½µ»Ø¸Õ¸Õ¼ÇÔØµÄ¸ß¶È£¬Ò²¾ÍÊÇcurrHeightÕâ¸ö±äÁ¿¼ÇÂ¼µÄ¸ß¶È,¼Ó5·ÀÖ¹±ÊÍ·ÎÛÈ¾ÆäËûµØ·½
-                                    if zCom != 0:
-                                        print("G1 Z" + str(currHeight + 1), file=f1)
-                                        print("G92 Z" + str(currHeight + 1 - zCom), file=f1)
-                                        print("ZCompensation:G92",file=f2)
-                                    print(Forcedz)
-                                    if Forcedz!=0:
-                                        print("G28 Y",file=f1)
-                                        print("G28 Z",file=f1)
-                                        print("ZCompensation:G28",file=f2)
-                                elif xtouch!=0:
-                                    print("G1 Z"+format(currHeight+Nozzoff,".3f"),file=f1)
-                                    #Éı¸ßÅç×ìÒÔ·À¹Ğ²ä
-                                    print("G1 X"+str(xtouch),file=f1)
-                                    #×²»÷´¥·¢
-                                    print("G1 X"+str(xtouch-35),file=f1)
-                                    #ËÉ¿ª
-                                print("Default Retract",file=f2)
-
-                            else:
-                                print(CustomR,file=f1)
-                                print("Customized Retract",file=f2)
-                            # ÈÕÖ¾¼ÇÂ¼
-                            flag1=False
-                            flag2=False
-    os.startfile(output)
-    os.startfile("log.txt")
-else:
-    with open("log.txt", "w") as f2:  # Êä³öÈÕÖ¾
-        print("Error: No available GCODE",file=f2)#ËµÃ÷³öÏÖÁËÃ»ÎÄ¼şµÄ´íÎó
+if __name__ == "__main__":
+    main()
+# ç­‰2ç§’å†å…³é—­
+window.mainloop()
+time.sleep(2)
+window.destroy()

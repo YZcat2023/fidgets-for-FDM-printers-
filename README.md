@@ -85,7 +85,7 @@ Get two M2.5*5 screws and four magnets with a diameter of 4mm and a thickness of
 ## Roadmap
 
 - [x] Ironing support interfaces option
-- [x] Add Manual.pdf
+- [x] Add MKP Manual.pdf
 - [ ] Add multi-color support
 - [ ] Multi-language Support
     - [ ] English

@@ -401,6 +401,7 @@ def main():
                 for index in range(len(InterFace)):
                     print(process_text(InterFace[index], X_Offset, Y_Offset), file=TempExporter)
                 InterFace.clear()  # 输出并清空已捕获的内容
+                print("G1 Z" + str(round(Current_Layer_Height+Z_Offset+2, 3)) + ";Avoid leaking", file=TempExporter)
                 for index in range(len(CustomRelease)):
                     print(CustomRelease[index], file=TempExporter)
                 for index in range(len(CustomClean)):
@@ -416,11 +417,13 @@ def main():
                     for index in range(len(InterFace)):
                         print(process_text(InterFace[index], X_Offset, Y_Offset), file=TempExporter)
                     InterFace.clear()  # 输出并清空已捕获的内容
-                    print("G1 Z" + str(round(Current_Layer_Height, 3)) + ";Lower nozzle", file=TempExporter)
+                    print("G1 Z" + str(round(Current_Layer_Height + Z_Offset + 2, 3)) + ";Avoid leaking",
+                          file=TempExporter)
                     for index in range(len(CustomRelease)):
                         print(CustomRelease[index], file=TempExporter)
                     for index in range(len(CustomClean)):
                         print(CustomClean[index], file=TempExporter)
+                    print("G1 Z" + str(round(Current_Layer_Height, 3)) + ";Lower nozzle", file=TempExporter)
             print(line, file=TempExporter)
     f.close()
     TempExporter.close()
@@ -432,6 +435,8 @@ def main():
                 os.rename(Output_Filename, GSourceFile)
             else:
                 pass
+        else:
+            tk.messagebox.showinfo(title='警报', message='错误。请调整打印件位置后重新切片')
     except:
         tk.messagebox.showinfo(title='警报', message='错误。请调整打印件位置后重新切片')
     exit(0)
